@@ -27,6 +27,39 @@ A minimal two-panel web UI visualizes each stage live over SSE.
 > There is no "list pending requests" — SecureAuth *pushes* the request to the
 > authentication service.
 
+## Flow diagram
+
+Poll mode (editable source in [Lucid](https://lucid.app/lucidchart/e9918fde-ffcd-410b-8fd9-16eeb5db5cde/view)):
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant CD as Consumption Device
+    participant OP as SecureAuth (OP)
+    participant AS as Authentication Service
+    actor User
+
+    CD->>OP: bc-authorize (login_hint, scope, binding_message)
+    OP-->>CD: auth_req_id, expires_in, interval
+    OP->>AS: POST /user/verify
+    AS-->>OP: 200 valid
+    OP->>AS: POST /authentication/start (login_id, login_state, scopes)
+    AS-->>OP: 200 ack
+    Note over OP,AS: Steps 3-6 run synchronously inside bc-authorize
+    AS->>User: Prompt (binding message, scopes)
+    User-->>AS: Approve / Reject
+    loop every interval seconds until approved
+        CD->>OP: POST /token (grant=ciba, auth_req_id)
+        OP-->>CD: authorization_pending
+    end
+    AS->>OP: POST /scope-grants/{login}/accept (login_state, granted_scopes)
+    OP-->>AS: 200
+    CD->>OP: POST /token (grant=ciba, auth_req_id)
+    OP-->>CD: 200 access_token + id_token
+    Note over CD,OP: Ping mode: SecureAuth calls /api/cd/ping after accept, then CD fetches the token once
+    Note over AS,OP: Reject path: AS calls /scope-grants/{login}/reject → CD poll resolves to access_denied
+```
+
 ## Architecture
 
 ```
