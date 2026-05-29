@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CIBA Sample — SecureAuth/Cloudentity</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>CIBA Sample</h1>
+      <div id="config-bar" class="config-bar">loading config…</div>
+    </header>
+
+    <main>
+      <section class="panel" id="cd-panel">
+        <h2>① Consumption device</h2>
+        <p class="hint">Initiates backchannel auth and obtains the token.</p>
+        <form id="cd-form">
+          <label>login_hint
+            <input name="loginHint" placeholder="alice@example.com" required />
+          </label>
+          <label>scope
+            <input name="scope" id="cd-scope" />
+          </label>
+          <label>binding_message (optional)
+            <input name="bindingMessage" placeholder="Approve login on your phone" />
+          </label>
+          <button type="submit">Start authentication</button>
+        </form>
+        <div id="cd-list" class="list"></div>
+      </section>
+
+      <section class="panel" id="as-panel">
+        <h2>② Authentication service</h2>
+        <p class="hint">
+          SecureAuth pushes the request here; approve or reject on the user's behalf.
+        </p>
+        <div id="as-empty" class="empty">Waiting for SecureAuth to notify this service…</div>
+        <div id="as-list" class="list"></div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
