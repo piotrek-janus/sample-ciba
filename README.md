@@ -60,6 +60,66 @@ sequenceDiagram
     Note over AS,OP: Reject path: AS calls /scope-grants/{login}/reject → CD poll resolves to access_denied
 ```
 
+## Sample using Identity Pools as a user store
+
+A variant where the Authentication Service backs onto a **SecureAuth Identity
+Pool** as its user store: the pool confirms the user exists during `/user/verify`,
+and delivers + verifies an **SMS OTP** as the actual authentication during
+`/authentication/start` (replacing the manual Approve/Reject step).
+
+Assumptions (confirm against your tenant): the Identity Pool has an SMS/OTP
+provider configured and exposes APIs to look up a user by identifier, send an OTP,
+and verify an OTP; `login_hint`/`user_identifier` resolves to a user with a phone
+number.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant CD as Consumption Device
+    participant OP as SecureAuth (OP)
+    participant AS as Authentication Service
+    participant IP as SecureAuth Identity Pool
+    actor User
+
+    CD->>OP: bc-authorize (login_hint, scope, binding_message)
+    OP-->>CD: auth_req_id, expires_in, interval
+
+    Note over OP,AS: steps 3-8 run synchronously inside bc-authorize
+    OP->>AS: POST /user/verify (user_identifier)
+    AS->>IP: look up user by identifier
+    alt user exists
+        IP-->>AS: user found (+ phone number)
+        AS-->>OP: 200 valid
+    else not found
+        IP-->>AS: 404 not found
+        AS-->>OP: 404 invalid → bc-authorize fails
+    end
+    OP->>AS: POST /authentication/start (login_id, login_state, scopes)
+    AS-->>OP: 200 ack
+
+    AS->>IP: request SMS OTP for user
+    IP->>User: SMS: one-time code
+    User->>AS: submit OTP code (auth service UI)
+    AS->>IP: verify OTP
+
+    alt OTP valid
+        IP-->>AS: verified
+        AS->>OP: POST /scope-grants/{login}/accept (login_state, granted_scopes)
+        OP-->>AS: 200
+    else OTP invalid / expired
+        IP-->>AS: rejected
+        AS->>OP: POST /scope-grants/{login}/reject
+        OP-->>AS: 200
+    end
+
+    loop every interval seconds until decision
+        CD->>OP: POST /token (grant=ciba, auth_req_id)
+        OP-->>CD: authorization_pending
+    end
+    CD->>OP: POST /token (grant=ciba, auth_req_id)
+    OP-->>CD: 200 access_token + id_token  (or access_denied)
+```
+
 ## Architecture
 
 ```
